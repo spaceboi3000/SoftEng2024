@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Responsive Highcharts Pie Chart</title>
+  <script src="https://code.highcharts.com/10/highcharts.js"></script>
+  <style>
+    /* Ensure the container fills the parent widget and maintains responsiveness */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- The container for the Highcharts graph -->
+  <div id="container"></div>
+  <noscript>
+    <p>JavaScript is required to view this chart. Please enable JavaScript in your browser.</p>
+  </noscript>
+
+  <script>
+    let chart; // Declare the chart variable globally
+
+    document.addEventListener('DOMContentLoaded', function () {
+      chart = Highcharts.chart('container', {
+        chart: {
+          type: 'pie',
+          height: null, // Allows Highcharts to adapt to the container height
+        },
+        title: {
+          text: 'Διελεύσεις ανά operator',
+        },
+        tooltip: {
+          pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>',
+        },
+        accessibility: {
+          point: {
+            valueSuffix: '%',
+          },
+        },
+        plotOptions: {
+          pie: {
+            allowPointSelect: true,
+            cursor: 'pointer',
+            dataLabels: {
+              enabled: true,
+              format: '<b>{point.name}</b>: {point.percentage:.1f} %',
+            },
+          },
+        },
+        series: [
+          {
+            name: 'Διελεύσεις',
+            colorByPoint: true,
+            data: [
+              { name: 'gefyra', y: 25.0 },
+              { name: 'aegeanmotorway', y: 15.0 },
+              { name: 'kentrikiodos', y: 10.0 },
+              { name: 'egnatia', y: 12.0 },
+              { name: 'moreas', y: 8.0 },
+              { name: 'naodos', y: 10.0 },
+              { name: 'neaodos', y: 12.0 },
+              { name: 'olympiaodos', y: 8.0 },
+            ],
+          },
+        ],
+      });
+
+      // Function to export chart as image
+      window.exportChartAsImage = function (filename = 'chart_pie') {
+        chart.exportChartLocal({
+          type: 'image/png',
+          filename: filename,
+        });
+      };
+    });
+  </script>
+</body>
+</html>
