@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: se2407-cli
+Version: 1.0.0
+Summary: SE2407 Command Line Interface
+Author: se2407
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent

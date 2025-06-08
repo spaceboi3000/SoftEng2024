@@ -1,0 +1,798 @@
+openapi: 3.0.0
+info:
+  title: Toll System API
+  description: API for man aging toll stations, passes, and related operations
+  version: 1.0.0
+servers:
+  - url: http://localhost:9115
+    description: Local development server
+
+
+
+paths:
+  /login:
+    post:
+      summary: Authenticate user and get JWT token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '500':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /logout:
+    post:
+      summary: Log out the current user
+      description: Revokes the current user's authentication token.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Successful logout.
+        '401':
+          description: Unauthorized access.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                    
+  /api/admin/healthcheck:
+    get:
+      summary: Check system health
+      parameters:
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [json, csv]
+          description: Response format
+      responses:
+        '200':
+          description: System health information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+            text/csv:
+              schema:
+                type: string
+        '500':
+          description: Server error make sure the server is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Client error. Check your connection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/resetpasses:
+    post:
+      summary: Reset all passes data
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Passes reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/resetstations:
+    post:
+      summary: Reset toll stations data
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Stations reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'                    
+
+  /api/admin/addpasses:
+    post:
+      summary: Add new passes from CSV file
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Passes added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '500':
+          description: Server error. Passes were not added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+            
+
+  /api/tollStationPasses/{tollStationID}/{date_from}/{date_to}:
+    get:
+      summary: Get passes through a specific toll station for a given time period
+      description: Returns detailed information about passes through a specific toll station, including pass details and vehicle tags
+      parameters:
+        - in: path
+          name: tollStationID
+          required: true
+          schema:
+            type: string
+          description: ID of the toll station
+        - in: path
+          name: date_from
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date of the period (YYYYMMDD)
+        - in: path
+          name: date_to
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date of the period (YYYYMMDD)
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [json, csv]
+          description: Response format (defaults to json)
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TollStationPassesResponse'
+              example:
+                stationID: "NAO30"
+                stationOperator: "NAO"
+                requestTimestamp: "2024-01-06T12:00:00Z"
+                periodFrom: "20220101"
+                periodTo: "20220601"
+                nPasses: 2
+                passList: [
+                  {
+                    "passIndex": 1,
+                    "passID": "PASS123",
+                    "timestamp": "2022-01-15T14:30:00Z",
+                    "tagID": "TAG001",
+                    "tagProvider": "ProviderA",
+                    "passType": "home",
+                    "passCharge": 2.50
+                  }
+                ]
+            text/csv:
+              schema:
+                type: string
+              example: |
+                stationID,NAO30
+                stationOperator,NAO
+                requestTimestamp,2024-01-06T12:00:00Z
+                periodFrom,20220101
+                periodTo,20220601
+                nPasses,2
+                passIndex,passID,timestamp,tagID,tagProvider,passType,passCharge
+                1,PASS123,2022-01-15T14:30:00Z,TAG001,ProviderA,home,2.50
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/passAnalysis/{stationOpID}/{tagOpID}/{date_from}/{date_to}:
+    get:
+      summary: Get pass analysis for a station operator and tag operator
+      parameters:
+        - in: path
+          name: stationOpID
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: tagOpID
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: date_from
+          required: true
+          schema:
+            type: string
+            format: date
+        - in: path
+          name: date_to
+          required: true
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [json, csv]
+      responses:
+        '200':
+          description: Pass analysis data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassAnalysis'
+            text/csv:
+              schema:
+                type: string
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /api/chargesBy/{tollOpID}/{date_from}/{date_to}:
+    get:
+      summary: Get charges by operator for a specific period
+      description: Returns the charges and number of passes for each visiting operator at the specified operator's toll stations
+      parameters:
+        - in: path
+          name: tollOpID
+          required: true
+          schema:
+            type: string
+          description: ID of the toll operator
+        - in: path
+          name: date_from
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date of the period (YYYYMMDD)
+        - in: path
+          name: date_to
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date of the period (YYYYMMDD)
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [json, csv]
+          description: Response format (defaults to json)
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChargesByResponse'
+            text/csv:
+              schema:
+                type: string
+                
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /api/admin/usermod/{username}/{password}:
+    post:
+      summary: Create or update user
+      description: It receives a username and a password as input and creates the user or modifies the already existing user
+      parameters: 
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: password
+          required: true
+          schema:
+            type: string
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User created or updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          description: Bad request. Missing username or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
+  /api/admin/users:
+    get:
+      summary: Get a list of all users
+      description: Retrieves a list of usernames for all users in the system.
+      responses:
+        '200':
+          description: Successful response with a list of usernames.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  users:
+                    type: array
+                    items:
+                      type: string
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                    
+  /api/payDebt/{payingOpID}/{receivingOpID}/{amount_paid}:
+    post:
+      summary: Process debt payment between operators
+      description: It performs a transaction between two operators. The paying Operator pays the Receiving Operator the specifid amount.
+      parameters:
+        - in: path
+          name: payingOpID
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: receivingOpID
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: amount_paid
+          required: true
+          schema:
+            type: number
+            format: float
+      responses:
+        '200':
+          description: Debt payment processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          description: Bad request. Missing parameters or invalid amount
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'                    
+
+  /api/showsDebtFrom/{operatorID}:
+    get:
+      summary: Get debts owed *by* an operator
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: operatorID
+          required: true
+          schema:
+            type: string
+          description: ID of the operator
+      responses:
+        '200':
+          description: Successful retrieval of debt information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebtResponse'  # Reuse the DebtResponse schema
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/showsDebtTo/{operatorID}:
+    get:
+      summary: Get debts owed to an operator
+      description: It displays all debts owed to the requested operator.
+      parameters:
+        - in: path
+          name: operatorID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of debts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  operatorID:
+                    type: string
+                  debtList:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        Debtor:
+                          type: string
+                        Creditor:
+                          type: string
+                        DebtAmount:
+                          type: number
+                        DebtStartDate:
+                          type: string
+                          format: date
+                  requestTimestamp:
+                    type: string
+                    format: date-time
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        
+  /api/passesCost/{tollOpID}/{tagOpID}/{date_from}/{date_to}:
+    get:
+      summary: Calculate the cost of passes for a given period
+      description: Calculates the total number of passes and their cost for a specific Toll Operator (tollOpID) and Tag Operator (tagOpID) within a date range (date_from to date_to).
+      parameters:
+        - name: tollOpID
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the Toll Operator.
+
+        - name: tagOpID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: The ID of the Tag Operator.
+
+        - name: date_from
+          in: path
+          required: true
+          schema:
+            type: string
+            #format: date
+          description: The start date of the period in YYYYMMDD format.
+        - name: date_to
+          in: path
+          required: true
+          schema:
+            type: string
+            #format: date
+          description: The end date of the period in YYYYMMDD format.
+
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+         
+          description: The desired format of the response (JSON or CSV).
+
+      responses:
+        '200':
+          description: Successful response with the calculated cost and number of passes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/passesCost'
+            text/csv:
+              schema:
+                type: string
+                description: CSV response with data in comma-separated format.
+
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Client error. Check your connection and try again
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Server error. Try again later.
+  
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+        dbconnection:
+          type: string
+        n_stations:
+          type: integer
+        n_passes:
+          type: integer
+          
+    PassAnalysis:
+      type: object
+      properties:
+        stationOpID:
+          type: string
+        tagOpID:
+          type: string
+        requestTimestamp:
+          type: string
+          format: date-time
+        periodFrom:
+          type: string
+          format: date
+        periodTo:
+          type: string
+          format: date
+        nPasses:
+          type: integer
+        passList:
+          type: array
+          items:
+            type: object
+            properties:
+              passIndex:
+                type: integer
+              passID:
+                type: string
+              stationID:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+              tagID:
+                type: string
+              passCharge:
+                type: number
+    ChargesByResponse:
+      type: object
+      properties:
+        tollOpID:
+          type: string
+        requestTimestamp:
+          type: string
+          format: date-time
+        periodFrom:
+          type: string
+          format: date
+        periodTo:
+          type: string
+          format: date
+        vOpList:
+          type: array
+          items:
+            type: object
+            properties:
+              visitingOpID:
+                type: string
+              nPasses:
+                type: integer
+              passesCost:
+                type: number
+    TollStationPassesResponse:
+      type: object
+      properties:
+        stationID:
+          type: string
+        stationOperator:
+          type: string
+        requestTimestamp:
+          type: string
+          format: date-time
+        periodFrom:
+          type: string
+          format: date
+        periodTo:
+          type: string
+          format: date
+        nPasses:
+          type: integer
+        passList:
+          type: array
+          items:
+            type: object
+            properties:
+              passIndex:
+                type: integer
+              passID:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+              tagID:
+                type: string
+              tagProvider:
+                type: string
+              passType:
+                type: string
+              passCharge:
+                type: number
+                format: float
+    passesCost:
+      type: object
+      properties:
+        tollOpID:
+          type: integer
+          description: The ID of the Toll Operator.
+        tagOpID:
+          type: integer
+          description: The ID of the Tag Operator.
+        requestTimestamp:
+          type: string
+          format: date-time
+          description: The UTC timestamp of the request.
+        periodFrom:
+          type: string
+          format: date
+          description: The start date of the period.
+        periodTo:
+          type: string
+          format: date
+          description: The end date of the period.
+        nPasses:
+          type: integer
+          description: The total number of passes within the period.
+        passesCost:
+          type: number
+          description: The total cost of the passes within the period.
+    DebtResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        operatorID:
+          type: string
+        debtList:
+          type: array
+          items:
+            type: object
+            properties:
+              Debtor:
+                type: string
+              Creditor:
+                type: string
+              DebtAmount:
+                type: number
+                format: float # Important for monetary values
+              DebtStartDate:
+                type: string
+                format: date
+        requestTimestamp:
+          type: string
+          format: date-time
+      required:
+        - status
+        - operatorID
+        - debtList
+        - requestTimestamp
